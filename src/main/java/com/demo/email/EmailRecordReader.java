@@ -126,40 +126,48 @@ public class EmailRecordReader extends RecordReader<LongWritable, Email>  {
 
         // We always read one extra line, which lies outside the upper
         // split limit i.e. (end - 1)
+        int counter = 0;
         while (getFilePosition() <= end) {
+            counter +=1;
+            LOG.info("Counter at: " + counter);
             newSize = in.readLine(value, maxLineLength,
                     Math.max(maxBytesToConsume(pos), maxLineLength));
             LOG.info("newSize: " + newSize);
             LOG.info("current value: " + value.toString());
 
             if (value.toString().startsWith("From:")) {
-                email.setFrom(value.toString());
-                toggle = true;
-            }
-            if (value.toString().startsWith("To:")) {
-                email.setTo(value.toString());
-                toggle = true;
-            }
-            if (value.toString().startsWith("Date:")) {
-                email.setDate(value.toString());
-                toggle = true;
-            }
-            if (value.toString().startsWith("Subject:")) {
-                email.setSubject(value.toString());
-                toggle = true;
-            }
-            if (value.toString().startsWith("Message-ID:")) {
-                email.setMessageID(value.toString());
-                toggle = true;
+                if (toggle) {
+                    LOG.info("Found the next record 'From' backing off and returning...");
+                    pos = pos - newSize;
+                    return true;
+                }
+                else {
+                    LOG.info("############################################################################  - FROM -" + value.toString());
+                    email.setFrom(value.toString());
+                    toggle = true;
+                }
             }
 
+           else if (value.toString().startsWith("Date:")) {
+                email.setDate(value.toString());
+
+            }
+           else if (value.toString().startsWith("Subject:")) {
+                email.setSubject(value.toString());
+
+            }
+           else if (value.toString().startsWith("Message-ID:")) {
+                email.setMessageID(value.toString());
+
+            }
+           else {
+                LOG.info("Message ----------- " + value.toString());
+                email.setMessage(value.toString());
+            }
             if (newSize == 0) {
                 break;
             }
             pos += newSize;
-            if (newSize < maxLineLength) {
-                break;
-            }
 
             // line too long. try again
             LOG.info("Skipped line of size " + newSize + " at pos " +
@@ -167,10 +175,12 @@ public class EmailRecordReader extends RecordReader<LongWritable, Email>  {
         }
         if (newSize == 0) {
             // We've reached end of Split
+            LOG.info("somehow didn't increment");
             key = null;
             value = null;
             return false;
         } else {
+            LOG.info("at returning toggle");
             return toggle;
         }
 

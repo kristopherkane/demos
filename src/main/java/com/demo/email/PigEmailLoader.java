@@ -37,10 +37,10 @@ public class PigEmailLoader extends LoadFunc {
             tuple=tupleFactory.newTuple(5);
 
             tuple.set(0, email.getFrom());
-            tuple.set(1, email.getTo());
+            tuple.set(1, email.getSubject());
             tuple.set(2, email.getDate());
-            tuple.set(3, email.getSubject());
-            tuple.set(4, email.getMessageID());
+            tuple.set(3, email.getMessageID());
+            tuple.set(4, email.getMessage());
             DataBag dataBag =  BagFactory.getInstance().newDefaultBag();
 
             dataBag.add(tuple);
