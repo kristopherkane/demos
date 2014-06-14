@@ -17,6 +17,8 @@ import org.apache.hadoop.mapreduce.lib.input.FileSplit;
 import org.apache.hadoop.util.LineReader;
 
 import java.io.IOException;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 
 public class EmailRecordReader extends RecordReader<LongWritable, Email>  {
@@ -123,45 +125,51 @@ public class EmailRecordReader extends RecordReader<LongWritable, Email>  {
         email = new Email();
         toggle = false;
         value.clear();
+        String from = "";
+        Pattern from_name_pattern = Pattern.compile("\\((.*?)\\)", Pattern.DOTALL);
 
         // We always read one extra line, which lies outside the upper
         // split limit i.e. (end - 1)
-        int counter = 0;
         while (getFilePosition() <= end) {
-            counter +=1;
-            LOG.info("Counter at: " + counter);
             newSize = in.readLine(value, maxLineLength,
                     Math.max(maxBytesToConsume(pos), maxLineLength));
-            LOG.info("newSize: " + newSize);
-            LOG.info("current value: " + value.toString());
-
             if (value.toString().startsWith("From:")) {
+                from = "";
                 if (toggle) {
-                    LOG.info("Found the next record 'From' backing off and returning...");
                     pos = pos - newSize;
                     return true;
                 }
                 else {
-                    LOG.info("############################################################################  - FROM -" + value.toString());
-                    email.setFrom(value.toString());
+                    from = value.toString().replaceAll("^From:+","");
+                    if (from.split("at").length != 2) {
+                        email.setFrom(from);
+                    }
+                    else {
+                        email.setFromEmailID(from.split("at")[0]);
+                        String domain = from.split("at")[1];
+                        if (domain.contains(".")){
+                            email.setFromDomainName(domain.split(".")[0]);
+                            email.setFromDomainTLD(domain.split(".")[1].split(" ")[0]);
+                            Matcher from_name_match = from_name_pattern.matcher(domain.split(".")[1].split(" ")[1]);
+                            if (from_name_match.find()) {
+                                email.setFromName(from_name_match.group(1));
+                            }
+                        }
+                    }
+                    email.setFrom(from);
                     toggle = true;
                 }
             }
-
-           else if (value.toString().startsWith("Date:")) {
-                email.setDate(value.toString());
-
-            }
            else if (value.toString().startsWith("Subject:")) {
-                email.setSubject(value.toString());
-
+                email.setSubject(value.toString().replaceAll("^Subject:+",""));
+            }
+            else if (value.toString().startsWith("Date:")) {
+                email.setDate(value.toString().replaceAll("^Date:+",""));
             }
            else if (value.toString().startsWith("Message-ID:")) {
-                email.setMessageID(value.toString());
-
+                email.setMessageID(value.toString().replaceAll("^Message-ID:+",""));
             }
            else {
-                LOG.info("Message ----------- " + value.toString());
                 email.setMessage(value.toString());
             }
             if (newSize == 0) {
@@ -170,20 +178,16 @@ public class EmailRecordReader extends RecordReader<LongWritable, Email>  {
             pos += newSize;
 
             // line too long. try again
-            LOG.info("Skipped line of size " + newSize + " at pos " +
-                    (pos - newSize));
+            LOG.info("Skipped line of size " + newSize + " at pos " + (pos - newSize));
         }
         if (newSize == 0) {
             // We've reached end of Split
-            LOG.info("somehow didn't increment");
             key = null;
             value = null;
             return false;
         } else {
-            LOG.info("at returning toggle");
             return toggle;
         }
-
     }
 
     @Override
