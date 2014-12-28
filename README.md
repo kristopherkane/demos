@@ -1,1 +1,1 @@
-Yo - Hadoop oriented demonstrations I am putting together. 
+MapReduce recordreader for parsing mailmain compressed archives and storage into Hive
